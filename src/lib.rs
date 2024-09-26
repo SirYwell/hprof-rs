@@ -4,6 +4,7 @@
 use std::fs::File;
 
 pub mod tags;
+mod reader;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right
@@ -13,7 +14,8 @@ pub fn add(left: usize, right: usize) -> usize {
 mod tests {
     use super::*;
     use std::fmt::Debug;
-    use std::io::{BufRead, BufReader, Error, ErrorKind};
+    use std::io::{BufRead, BufReader, Error, ErrorKind, Read};
+    use crate::reader::HprofReader;
 
     #[test]
     fn it_works() -> std::io::Result<()> {
@@ -26,6 +28,11 @@ mod tests {
         }
         let zero_index = reader.skip_until(0)?;
         assert_eq!(header.len() + 1, zero_index);
+        let mut hprof_reader = HprofReader::new(reader);
+        let identifier_size = hprof_reader.read_u4()?;
+        assert_eq!(identifier_size, 8);
+        let timestamp = hprof_reader.read_u8()?;
+        println!("{:?}", timestamp);
         Ok(())
     }
 }

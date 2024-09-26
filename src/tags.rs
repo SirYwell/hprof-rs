@@ -28,8 +28,9 @@ pub enum Tag<'a, T> {
     HprofHeapDumpSegment,
     HprofHeapDumpEnd,
 }
-type U1 = u8;
-type U4 = u32;
+pub type U1 = u8;
+pub type U4 = u32;
+pub type U8 = u64;
 union ID {
     id: u32,
 }
