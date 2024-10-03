@@ -41,7 +41,7 @@ pub enum RecordTag {
     HprofControlSettings,
     HprofHeapDumpSegment {
         base: RecordBase,
-        sub_records: Vec<HeapDumpTag>
+        sub_records: Vec<HeapDumpTag>,
     },
     HprofHeapDumpEnd,
 }
@@ -52,25 +52,25 @@ pub enum HeapDumpTag {
     HprofGcRootThreadObj {
         thread_object_id: U8,
         thread_sequence_number: U4,
-        stack_trace_sequence_number: U4
+        stack_trace_sequence_number: U4,
     },
     HprofGcRootJniGlobal {
         object_id: U8,
-        jni_global_ref_id: U8
+        jni_global_ref_id: U8,
     },
     HprofGcRootJniLocal {
         object_id: U8,
         thread_serial_number: U4,
-        frame_number: U4 // "frame # in stack trace (-1 for empty)" ...???
+        frame_number: U4, // "frame # in stack trace (-1 for empty)" ...???
     },
     HprofGcRootJavaFrame {
         object_id: U8,
         thread_serial_number: U4,
-        frame_number: U4 // "frame # in stack trace (-1 for empty)" ...???
+        frame_number: U4, // "frame # in stack trace (-1 for empty)" ...???
     },
     HprofGcRootNativeStack,
     HprofGcRootStickyClass {
-        object_id: U8
+        object_id: U8,
     },
     HprofGcRootThreadBlock,
     HprofGcRootMonitorUsed,
@@ -79,18 +79,18 @@ pub enum HeapDumpTag {
         object_id: U8,
         stack_trace_serial_number: U4,
         class_object_id: U8,
-        instance_field_values: Vec<Value>
+        instance_field_values: Vec<Value>,
     },
     HprofGcObjArrayDump {
         array_object_id: U8,
         stack_trace_serial_number: U4,
         array_class_id: U8,
-        elements: Vec<U8>
+        elements: Vec<U8>,
     },
     HprofGcPrimArrayDump {
         array_object_id: U8,
         stack_trace_serial_number: U4,
-        elements: Vec<Value> // TODO only one type is valid here, can we represent that?
+        elements: Vec<Value>, // TODO only one type is valid here, can we represent that?
     },
 }
 
@@ -156,7 +156,7 @@ impl Identifier for U8 {
 }
 pub struct RecordBase {
     pub(crate) micros_since: U4,
-    pub(crate) size_remaining: U4
+    pub(crate) size_remaining: U4,
 }
 
 #[derive(Clone)]
@@ -169,23 +169,19 @@ pub struct ClassInfo {
     pub protection_domain_object_id: U8,
     pub instance_size: U4,
     pub static_fields: Vec<FieldInfo>,
-    pub instance_fields: Vec<FieldInfo>
+    pub instance_fields: Vec<FieldInfo>,
 }
 #[derive(Clone)]
 pub struct FieldInfo {
     pub name_id: U8,
     pub type_tag: U1,
-    pub value: Option<Value>
+    pub value: Option<Value>,
 }
 
 #[derive(Clone)]
 pub enum Value {
-    Object {
-        object_id: U8
-    },
-    Array {
-        object_id: U8
-    },
+    Object { object_id: U8 },
+    Array { object_id: U8 },
     Byte(i8),
     Char(u16),
     Short(i16),
@@ -193,5 +189,5 @@ pub enum Value {
     Double(f64),
     Int(i32),
     Long(i64),
-    Boolean(bool)
+    Boolean(bool),
 }

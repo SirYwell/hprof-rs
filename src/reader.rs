@@ -1,12 +1,14 @@
-use std::collections::HashMap;
 use crate::hprof_model;
-use crate::hprof_model::{ClassInfo, FieldInfo, HeapDumpTag, RecordBase, RecordTag, Value, I4, U2, U4, U8};
-use hprof_model::U1;
-use std::io::{Error, ErrorKind, Read, Seek};
 use crate::hprof_model::HeapDumpTag::HprofGcPrimArrayDump;
+use crate::hprof_model::{
+    ClassInfo, FieldInfo, HeapDumpTag, RecordBase, RecordTag, Value, I4, U2, U4, U8,
+};
+use hprof_model::U1;
+use std::collections::HashMap;
+use std::io::{Error, ErrorKind, Read, Seek};
 
 struct InternalHprofReader<T: Read + Seek> {
-    buf_reader: T
+    buf_reader: T,
 }
 
 pub struct HprofReader<T: Read + Seek> {
@@ -21,7 +23,9 @@ macro_rules! define_read_ux {
     ($name:ident, $type:ident, $size:expr) => {
         pub fn $name(&mut self) -> Result<$type, Error> {
             let mut buf = [0; size_of::<$type>()];
-            self.buf_reader.read_exact(&mut buf).map(|_| { $type::from_be_bytes(buf)})
+            self.buf_reader
+                .read_exact(&mut buf)
+                .map(|_| $type::from_be_bytes(buf))
         }
     };
 }
@@ -36,7 +40,7 @@ impl<T: Read + Seek> HprofReader<T> {
         let tag = self.reader.read_u1();
         // TODO better way to detect eof?
         if tag.is_err() {
-            return Ok(None) // eof
+            return Ok(None); // eof
         }
         let base = self.read_base()?;
         match tag? {
@@ -46,14 +50,17 @@ impl<T: Read + Seek> HprofReader<T> {
             0x05 => self.read_trace(base),
             0x1C => self.read_heap_dump_segment(base),
             0x2C => self.read_heap_dump_end(base),
-            v => panic!("unsupported tag: {:#x}", v)
+            v => panic!("unsupported tag: {:#x}", v),
         }
     }
 
     fn read_base(&mut self) -> Result<RecordBase, Error> {
         let micros = self.reader.read_u4()?;
         let body_size = self.reader.read_u4()?;
-        let base = RecordBase { micros_since: micros, size_remaining: body_size };
+        let base = RecordBase {
+            micros_since: micros,
+            size_remaining: body_size,
+        };
         Ok(base)
     }
 
@@ -66,14 +73,18 @@ impl<T: Read + Seek> HprofReader<T> {
         let string = String::from_utf8_lossy_owned(utf8.clone());
         // todo deal with lifetime of HprofUtf8/String properly
         self.name_cache.insert(id, string.clone());
-        Ok(Some(RecordTag::HprofUtf8 { base, id, utf8: string }))
+        Ok(Some(RecordTag::HprofUtf8 {
+            base,
+            id,
+            utf8: string,
+        }))
     }
 
     fn read_identifier(&mut self) -> Result<U8, Error> {
         let id = match self.identifier_size {
             4 => self.reader.read_u4()? as U8,
             8 => self.reader.read_u8()?,
-            _ => panic!("unsupported id size")
+            _ => panic!("unsupported id size"),
         };
         Ok(id)
     }
@@ -83,7 +94,13 @@ impl<T: Read + Seek> HprofReader<T> {
         let class_object_id = self.read_identifier()?;
         let stack_trace_serial_number = self.reader.read_u4()?;
         let class_name_id = self.read_identifier()?;
-        Ok(Some(RecordTag::HprofLoadClass { base, class_serial_number, class_object_id, stack_trace_serial_number, class_name_id}))
+        Ok(Some(RecordTag::HprofLoadClass {
+            base,
+            class_serial_number,
+            class_object_id,
+            stack_trace_serial_number,
+            class_name_id,
+        }))
     }
 
     fn read_trace(&mut self, base: RecordBase) -> Result<Option<RecordTag>, Error> {
@@ -94,7 +111,12 @@ impl<T: Read + Seek> HprofReader<T> {
         for idx in 0..number_of_frames {
             stack_frame_ids[idx as usize] = self.read_identifier()?;
         }
-        Ok(Some(RecordTag::HprofTrace { base, stack_trace_serial_number, thread_serial_number, stack_frame_ids}))
+        Ok(Some(RecordTag::HprofTrace {
+            base,
+            stack_trace_serial_number,
+            thread_serial_number,
+            stack_frame_ids,
+        }))
     }
 
     fn read_frame(&mut self, base: RecordBase) -> Result<Option<RecordTag>, Error> {
@@ -104,7 +126,15 @@ impl<T: Read + Seek> HprofReader<T> {
         let source_file_name_id: U8 = self.read_identifier()?;
         let class_serial_numer: U4 = self.reader.read_u4()?;
         let line_number: I4 = self.reader.read_u4()? as I4;
-        Ok(Some(RecordTag::HprofFrame { base, stack_frame_id, method_name_id, method_signature_id, source_file_name_id, class_serial_numer, line_number }))
+        Ok(Some(RecordTag::HprofFrame {
+            base,
+            stack_frame_id,
+            method_name_id,
+            method_signature_id,
+            source_file_name_id,
+            class_serial_numer,
+            line_number,
+        }))
     }
 
     fn read_heap_dump_segment(&mut self, base: RecordBase) -> Result<Option<RecordTag>, Error> {
@@ -122,11 +152,11 @@ impl<T: Read + Seek> HprofReader<T> {
                 0x21 => self.read_gc_instance_dump()?,
                 0x22 => self.read_gc_obj_array_dump()?,
                 0x23 => self.read_gc_prim_array_dump()?,
-                _ => panic!("unknown sub-record tag {:#x}", id)
+                _ => panic!("unknown sub-record tag {:#x}", id),
             };
             sub_records.push(s);
         }
-        Ok(Some(RecordTag::HprofHeapDumpSegment {base, sub_records}))
+        Ok(Some(RecordTag::HprofHeapDumpSegment { base, sub_records }))
     }
 
     fn read_heap_dump_end(&self, base: RecordBase) -> Result<Option<RecordTag>, Error> {
@@ -145,7 +175,10 @@ impl<T: Read + Seek> HprofReader<T> {
         let _ = self.read_identifier()?; // reserved
         let instance_size = self.reader.read_u4()?;
         let constant_pool_size = self.reader.read_u2()?;
-        assert_eq!(constant_pool_size, 0, "constant pool dumping is not supported");
+        assert_eq!(
+            constant_pool_size, 0,
+            "constant pool dumping is not supported"
+        );
         let static_fields_count = self.reader.read_u2()?;
         let static_fields = self.read_fields(static_fields_count, true)?;
         let instance_field_count = self.reader.read_u2()?;
@@ -160,29 +193,39 @@ impl<T: Read + Seek> HprofReader<T> {
             protection_domain_object_id,
             instance_size,
             static_fields: static_fields.clone(),
-            instance_fields: instance_fields.clone()
+            instance_fields: instance_fields.clone(),
         };
         self.class_cache.insert(class_object_id, class_dump.clone());
         Ok(HeapDumpTag::HprofGcClassDump(class_dump))
     }
 
     fn read_fields(&mut self, field_count: U2, with_value: bool) -> Result<Vec<FieldInfo>, Error> {
-        (0..field_count).map(|_| {
-            let name_id = self.read_identifier()?;
-            let type_tag = self.reader.read_u1()?;
-            let value = if with_value {
-                Some(self.read_value(type_tag)?)
-            } else {
-                None
-            };
-            Ok(FieldInfo { name_id, type_tag,value })
-        }).collect()
+        (0..field_count)
+            .map(|_| {
+                let name_id = self.read_identifier()?;
+                let type_tag = self.reader.read_u1()?;
+                let value = if with_value {
+                    Some(self.read_value(type_tag)?)
+                } else {
+                    None
+                };
+                Ok(FieldInfo {
+                    name_id,
+                    type_tag,
+                    value,
+                })
+            })
+            .collect()
     }
 
     fn read_value(&mut self, type_tag: U1) -> Result<Value, Error> {
         let v = match type_tag {
-            0x01 => Value::Array { object_id: self.read_identifier()? },
-            0x02 => Value::Object { object_id: self.read_identifier()? },
+            0x01 => Value::Array {
+                object_id: self.read_identifier()?,
+            },
+            0x02 => Value::Object {
+                object_id: self.read_identifier()?,
+            },
             0x04 => Value::Boolean(self.reader.read_u1()? != 0),
             0x05 => Value::Char(self.reader.read_u2()?),
             0x06 => Value::Float(f32::from_bits(self.reader.read_u4()?)),
@@ -191,7 +234,7 @@ impl<T: Read + Seek> HprofReader<T> {
             0x09 => Value::Short(self.reader.read_u2()? as i16),
             0x0A => Value::Int(self.reader.read_u4()? as i32),
             0x0B => Value::Long(self.reader.read_u8()? as i64),
-            _ => panic!("unsupported type tag {type_tag}")
+            _ => panic!("unsupported type tag {type_tag}"),
         };
         Ok(v)
     }
@@ -200,27 +243,42 @@ impl<T: Read + Seek> HprofReader<T> {
         let thread_object_id = self.read_identifier()?;
         let thread_sequence_number = self.reader.read_u4()?;
         let stack_trace_sequence_number = self.reader.read_u4()?;
-        Ok(HeapDumpTag::HprofGcRootThreadObj {thread_object_id, thread_sequence_number, stack_trace_sequence_number})
+        Ok(HeapDumpTag::HprofGcRootThreadObj {
+            thread_object_id,
+            thread_sequence_number,
+            stack_trace_sequence_number,
+        })
     }
 
     fn read_gc_root_java_frame(&mut self) -> Result<HeapDumpTag, Error> {
         let object_id = self.read_identifier()?;
         let thread_serial_number = self.reader.read_u4()?;
         let frame_number = self.reader.read_u4()?;
-        Ok(HeapDumpTag::HprofGcRootJavaFrame { object_id, thread_serial_number, frame_number})
+        Ok(HeapDumpTag::HprofGcRootJavaFrame {
+            object_id,
+            thread_serial_number,
+            frame_number,
+        })
     }
 
     fn read_gc_root_jni_local(&mut self) -> Result<HeapDumpTag, Error> {
         let object_id = self.read_identifier()?;
         let thread_serial_number = self.reader.read_u4()?;
         let frame_number = self.reader.read_u4()?;
-        Ok(HeapDumpTag::HprofGcRootJniLocal { object_id, thread_serial_number, frame_number})
+        Ok(HeapDumpTag::HprofGcRootJniLocal {
+            object_id,
+            thread_serial_number,
+            frame_number,
+        })
     }
 
     fn read_gc_root_jni_global(&mut self) -> Result<HeapDumpTag, Error> {
         let object_id = self.read_identifier()?;
         let jni_global_ref_id = self.read_identifier()?;
-        Ok(HeapDumpTag::HprofGcRootJniGlobal { object_id, jni_global_ref_id })
+        Ok(HeapDumpTag::HprofGcRootJniGlobal {
+            object_id,
+            jni_global_ref_id,
+        })
     }
 
     fn read_gc_root_sticky_class(&mut self) -> Result<HeapDumpTag, Error> {
@@ -250,11 +308,18 @@ impl<T: Read + Seek> HprofReader<T> {
             }
             values.push(self.read_value(field_opt.unwrap().type_tag)?)
         }
-        Ok(HeapDumpTag::HprofGcInstanceDump {object_id, stack_trace_serial_number, class_object_id, instance_field_values: values})
+        Ok(HeapDumpTag::HprofGcInstanceDump {
+            object_id,
+            stack_trace_serial_number,
+            class_object_id,
+            instance_field_values: values,
+        })
     }
 
     fn get_class_by_id(&self, object_id: U8) -> Result<&ClassInfo, Error> {
-        self.class_cache.get(&object_id).ok_or(Error::other("missing class"))
+        self.class_cache
+            .get(&object_id)
+            .ok_or(Error::other("missing class"))
     }
 
     fn read_gc_obj_array_dump(&mut self) -> Result<HeapDumpTag, Error> {
@@ -266,7 +331,12 @@ impl<T: Read + Seek> HprofReader<T> {
         for i in 0..(element_count as usize) {
             elements.insert(i, self.read_identifier()?);
         }
-        Ok(HeapDumpTag::HprofGcObjArrayDump {array_object_id, stack_trace_serial_number, array_class_id, elements})
+        Ok(HeapDumpTag::HprofGcObjArrayDump {
+            array_object_id,
+            stack_trace_serial_number,
+            array_class_id,
+            elements,
+        })
     }
 
     fn read_gc_prim_array_dump(&mut self) -> Result<HeapDumpTag, Error> {
@@ -278,7 +348,11 @@ impl<T: Read + Seek> HprofReader<T> {
         for i in 0..(element_count as usize) {
             elements.insert(i, self.read_value(type_tag)?);
         }
-        Ok(HprofGcPrimArrayDump {array_object_id, stack_trace_serial_number, elements})
+        Ok(HprofGcPrimArrayDump {
+            array_object_id,
+            stack_trace_serial_number,
+            elements,
+        })
     }
 }
 
@@ -300,7 +374,7 @@ impl<T: Read + Seek> InternalHprofReader<T> {
         let mut buf = [0u8; 19];
         self.buf_reader.read_exact(&mut buf)?;
         if buf.to_vec() != Vec::from(header) {
-            return Err(Error::from(ErrorKind::InvalidInput))
+            return Err(Error::from(ErrorKind::InvalidInput));
         }
         let identifier_size = self.read_u4()?;
         let timestamp = self.read_u8()?;
@@ -309,7 +383,7 @@ impl<T: Read + Seek> InternalHprofReader<T> {
             timestamp,
             reader: self,
             name_cache: HashMap::new(),
-            class_cache: HashMap::new()
+            class_cache: HashMap::new(),
         })
     }
 

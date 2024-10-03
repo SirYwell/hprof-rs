@@ -48,6 +48,7 @@
                       "cargo"
                       "rust-src"
                       "rustc"
+                      "rustfmt"
                     ];
 		              };
                 }

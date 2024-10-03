@@ -5,19 +5,14 @@
 use std::fs::File;
 
 pub mod hprof_model;
-mod reader;
-
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+pub mod reader;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hprof_model::RecordTag;
     use crate::reader::HprofReader;
     use std::fmt::Debug;
-    use std::io::{BufRead, BufReader, Error, ErrorKind};
+    use std::io::BufReader;
 
     #[test]
     fn it_works() -> std::io::Result<()> {
@@ -32,27 +27,8 @@ mod tests {
         while let Some(res) = hprof_reader.next() {
             c += 1;
             match res {
-                Ok(rec) => {
-                    match rec {
-                        RecordTag::HprofUtf8 { id, utf8, .. } => {
-                        }
-                        RecordTag::HprofLoadClass { class_name_id, .. } => {
-                            let name = hprof_reader.name(class_name_id);
-                            if name.is_none() {
-                                println!("no name???")
-                            }
-                        }
-                        RecordTag::HprofFrame { .. } => {}
-                        RecordTag::HprofTrace { .. } => {}
-                        other => {
-                            println!("{}", other)
-                        }
-                    }
-                }
-                Err(data) => {
-                    println!("error {data}");
-                    return Ok(())
-                }
+                Ok(_) => {}
+                Err(data) => return Err(data),
             }
         }
         println!("{}", c);
